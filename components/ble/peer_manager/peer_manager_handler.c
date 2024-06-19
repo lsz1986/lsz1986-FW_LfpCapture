@@ -368,9 +368,20 @@ void pm_handler_flash_clean(pm_evt_t const * p_pm_evt)
             break;
 
         case PM_EVT_CONN_SEC_FAILED:
-        case PM_EVT_CONN_SEC_CONFIG_REQ:
         case PM_EVT_CONN_SEC_PARAMS_REQ:
             break;
+				
+        case PM_EVT_CONN_SEC_CONFIG_REQ:
+				/* "HRM ECG" Access denied */
+				{
+						NRF_LOG_INFO("PM_EVT_CONN_SEC_CONFIG_REQ: peer_id=%d, accept to fix bonding\r\n",
+										 p_pm_evt->peer_id);
+
+						// Accept pairing request from an already bonded peer.
+						pm_conn_sec_config_t conn_sec_config = {.allow_repairing = true};
+						pm_conn_sec_config_reply(p_pm_evt->conn_handle, &conn_sec_config);
+				}
+						break;
 
         case PM_EVT_STORAGE_FULL:
             if (!flash_cleaning)

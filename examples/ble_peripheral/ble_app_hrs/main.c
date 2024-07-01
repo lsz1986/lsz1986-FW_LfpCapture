@@ -20,10 +20,8 @@
 #include <stdint.h>
 #include <string.h>
 #include "nordic_common.h"
-#include "nrf.h"
 
-#include "nrf_drv_saadc.h"
-#include "nrf_drv_ppi.h"
+#include "nrf.h"
 
 #include "nrf_sdm.h"
 #include "app_error.h"
@@ -56,6 +54,9 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
+//#include "task_sample_hrs.h"
+//#include "task_sample_battery.h"
+
 
 #define DEVICE_NAME                         "ECG_HRM"                            	/**< Name of device. Will be included in the advertising data. */
 #define MANUFACTURER_NAME                   "WuHan"                   				/**< Manufacturer. Will be passed to Device Information Service. */
@@ -66,20 +67,20 @@
 #define APP_BLE_CONN_CFG_TAG                1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 #define APP_BLE_OBSERVER_PRIO               3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 
-#define BATTERY_LEVEL_MEAS_INTERVAL         APP_TIMER_TICKS(1000)                   /**< Battery level measurement interval (ticks). */
-//#define MIN_BATTERY_LEVEL                   81                                      /**< Minimum simulated battery level. */
-//#define MAX_BATTERY_LEVEL                   100                                     /**< Maximum simulated 7battery level. */
-//#define BATTERY_LEVEL_INCREMENT             1                                       /**< Increment between each simulated battery level measurement. */
+#define BATTERY_LEVEL_MEAS_INTERVAL         APP_TIMER_TICKS(500)                   /**< Battery level measurement interval (ticks). */
+#define MIN_BATTERY_LEVEL                   81                                      /**< Minimum simulated battery level. */
+#define MAX_BATTERY_LEVEL                   100                                     /**< Maximum simulated 7battery level. */
+#define BATTERY_LEVEL_INCREMENT             1                                       /**< Increment between each simulated battery level measurement. */
 
-#define HEART_RATE_MEAS_INTERVAL            APP_TIMER_TICKS(1000)                   /**< Heart rate measurement interval (ticks). */
-//#define MIN_HEART_RATE                      140                                     /**< Minimum heart rate as returned by the simulated measurement function. */
-//#define MAX_HEART_RATE                      300                                     /**< Maximum heart rate as returned by the simulated measurement function. */
-//#define HEART_RATE_INCREMENT                10                                      /**< Value by which the heart rate is incremented/decremented for each call to the simulated measurement function. */
+#define HEART_RATE_MEAS_INTERVAL            APP_TIMER_TICKS(50)                   /**< Heart rate measurement interval (ticks). */
+#define MIN_HEART_RATE                      140                                     /**< Minimum heart rate as returned by the simulated measurement function. */
+#define MAX_HEART_RATE                      300                                     /**< Maximum heart rate as returned by the simulated measurement function. */
+#define HEART_RATE_INCREMENT                10                                      /**< Value by which the heart rate is incremented/decremented for each call to the simulated measurement function. */
 
 #define RR_INTERVAL_INTERVAL                APP_TIMER_TICKS(300)                    /**< RR interval interval (ticks). */
-//#define MIN_RR_INTERVAL                     100                                     /**< Minimum RR interval as returned by the simulated measurement function. */
-//#define MAX_RR_INTERVAL                     500                                     /**< Maximum RR interval as returned by the simulated measurement function. */
-//#define RR_INTERVAL_INCREMENT               1                                       /**< Value by which the RR interval is incremented/decremented for each call to the simulated measurement function. */
+#define MIN_RR_INTERVAL                     100                                     /**< Minimum RR interval as returned by the simulated measurement function. */
+#define MAX_RR_INTERVAL                     500                                     /**< Maximum RR interval as returned by the simulated measurement function. */
+#define RR_INTERVAL_INCREMENT               1                                       /**< Value by which the RR interval is incremented/decremented for each call to the simulated measurement function. */
 
 #define SENSOR_CONTACT_DETECTED_INTERVAL    APP_TIMER_TICKS(5000)                   /**< Sensor Contact Detected toggle interval (ticks). */
 
@@ -104,8 +105,6 @@
 #define SEC_PARAM_MAX_KEY_SIZE              16                                      /**< Maximum encryption key size. */
 
 #define DEAD_BEEF                           0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
-
-
 
 #define ADC_REF_VOLTAGE_IN_MILLIVOLTS   600                                     /**< Reference voltage (in milli volts) used by ADC while doing conversion. */
 #define ADC_PRE_SCALING_COMPENSATION    6                                       /**< The ADC is configured to use VDD with 1/3 prescaling as input. And hence the result of conversion is to be multiplied by 3 to get the actual value of the battery voltage.*/
@@ -225,18 +224,13 @@ static void pm_evt_handler(pm_evt_t const * p_evt)
 /**@brief Function for performing battery measurement and updating the Battery Level characteristic
  *        in Battery Service.
  */
-//static uint8_t i = 0;
 static void battery_level_update(void)
 {
     ret_code_t err_code;
-    uint8_t  battery_level;
-
-//    battery_level = (uint8_t)sensorsim_measure(&m_battery_sim_state, &m_battery_sim_cfg);
-//	battery_level = 85 + (++i%5);
-
+    uint8_t  battery_level = 77;
 	
-	//NRF_LOG_INFO("battery_level_update[%d].", battery_level);
 	
+
     err_code = ble_bas_battery_level_update(&m_bas, battery_level, BLE_CONN_HANDLE_ALL);
     if ((err_code != NRF_SUCCESS) &&
         (err_code != NRF_ERROR_INVALID_STATE) &&
@@ -274,16 +268,12 @@ static void battery_level_meas_timeout_handler(void * p_context)
  */
 static void heart_rate_meas_timeout_handler(void * p_context)
 {
-    static uint32_t cnt = 0;
-    ret_code_t      err_code;
-    uint16_t        heart_rate;
-
     UNUSED_PARAMETER(p_context);
+	
+    uint16_t        heart_rate = 99;	
 
-//    heart_rate = (uint16_t)sensorsim_measure(&m_heart_rate_sim_state, &m_heart_rate_sim_cfg);
 
-    cnt++;
-    err_code = ble_hrs_heart_rate_measurement_send(&m_hrs, heart_rate);
+    ret_code_t err_code = ble_hrs_heart_rate_measurement_send(&m_hrs, heart_rate);
     if ((err_code != NRF_SUCCESS) &&
         (err_code != NRF_ERROR_INVALID_STATE) &&
         (err_code != NRF_ERROR_RESOURCES) &&
@@ -297,7 +287,7 @@ static void heart_rate_meas_timeout_handler(void * p_context)
     // Disable RR Interval recording every third heart rate measurement.
     // NOTE: An application will normally not do this. It is done here just for testing generation
     // of messages without RR Interval measurements.
-    m_rr_interval_enabled = ((cnt % 3) != 0);
+    //m_rr_interval_enabled = ((cnt % 3) != 0);
 }
 
 
@@ -314,29 +304,10 @@ static void rr_interval_timeout_handler(void * p_context)
 
     if (m_rr_interval_enabled)
     {
-        uint16_t rr_interval;
+        uint16_t rr_interval = 88;
 
-//        rr_interval = (uint16_t)sensorsim_measure(&m_rr_interval_sim_state,
-//                                                  &m_rr_interval_sim_cfg);
 		
         ble_hrs_rr_interval_add(&m_hrs, rr_interval);
-		
-		
-//        rr_interval = (uint16_t)sensorsim_measure(&m_rr_interval_sim_state,
-//                                                  &m_rr_interval_sim_cfg);
-//        ble_hrs_rr_interval_add(&m_hrs, rr_interval);
-//        rr_interval = (uint16_t)sensorsim_measure(&m_rr_interval_sim_state,
-//                                                  &m_rr_interval_sim_cfg);
-//        ble_hrs_rr_interval_add(&m_hrs, rr_interval);
-//        rr_interval = (uint16_t)sensorsim_measure(&m_rr_interval_sim_state,
-//                                                  &m_rr_interval_sim_cfg);
-//        ble_hrs_rr_interval_add(&m_hrs, rr_interval);
-//        rr_interval = (uint16_t)sensorsim_measure(&m_rr_interval_sim_state,
-//                                                  &m_rr_interval_sim_cfg);
-//        ble_hrs_rr_interval_add(&m_hrs, rr_interval);
-//        rr_interval = (uint16_t)sensorsim_measure(&m_rr_interval_sim_state,
-//                                                  &m_rr_interval_sim_cfg);
-//        ble_hrs_rr_interval_add(&m_hrs, rr_interval);
     }
 }
 
@@ -912,70 +883,6 @@ static void buttons_leds_init(bool * p_erase_bonds)
     *p_erase_bonds = (startup_event == BSP_EVENT_CLEAR_BONDING_DATA);
 }
 
-
-/**@brief Function for handling the ADC interrupt.
- *
- * @details  This function will fetch the conversion result from the ADC, convert the value into
- *           percentage and send it to peer.
- */
-static void saadc_event_handler(nrf_drv_saadc_evt_t const * p_event)
-{
-    if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
-    {
-        nrf_saadc_value_t adc_result;
-        uint16_t          batt_lvl_in_milli_volts;
-        uint8_t           percentage_batt_lvl;
-        uint32_t          err_code;
-
-        adc_result = p_event->data.done.p_buffer[0];
-
-        err_code = nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, 1);
-        APP_ERROR_CHECK(err_code);
-
-        batt_lvl_in_milli_volts = ADC_RESULT_IN_MILLI_VOLTS(adc_result) +
-                                  DIODE_FWD_VOLT_DROP_MILLIVOLTS;
-        percentage_batt_lvl = battery_level_in_percent(batt_lvl_in_milli_volts);
-
-		NRF_LOG_INFO("saadc_event_handler[%d].", percentage_batt_lvl);
-
-
-        err_code = ble_bas_battery_level_update(&m_bas, percentage_batt_lvl, BLE_CONN_HANDLE_ALL);
-        if ((err_code != NRF_SUCCESS) &&
-            (err_code != NRF_ERROR_INVALID_STATE) &&
-            (err_code != NRF_ERROR_RESOURCES) &&
-            (err_code != NRF_ERROR_BUSY) &&
-            (err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
-           )
-        {
-            APP_ERROR_HANDLER(err_code);
-        }
-    }
-}
-
-static nrf_saadc_value_t adc_buf[2];
-
-/**@brief Function for configuring ADC to do battery level conversion.
- */
-static void adc_configure(void)
-{
-    ret_code_t err_code;
-
-    nrf_saadc_channel_config_t config =
-        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN2);//NRF_SAADC_INPUT_VDD
-	
-	err_code = nrf_drv_saadc_init(NULL, saadc_event_handler);
-    APP_ERROR_CHECK(err_code);	
-	
-    err_code = nrf_drv_saadc_channel_init(0, &config);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_saadc_buffer_convert(&adc_buf[0], 1);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_saadc_buffer_convert(&adc_buf[1], 1);
-    APP_ERROR_CHECK(err_code);
-}
-
 /**@brief Function for initializing the nrf log module.
  */
 static void log_init(void)
@@ -1023,18 +930,20 @@ int main(void)
 
     // Initialize.
     log_init();
-
+	
+	/* RTC Timer */
     timers_init();
 
     buttons_leds_init(&erase_bonds);
-
 
     power_management_init();
 
     ble_stack_init();
 
-	adc_configure();
-
+	/* SAADC Sample */
+//	saadc_hrs_init();
+//	saadc_hrs_sampling_event_init();
+//	saadc_hrs_sampling_event_enable();
 
     gap_params_init();
     gatt_init();

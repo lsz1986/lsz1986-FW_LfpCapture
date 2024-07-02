@@ -57,8 +57,7 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-//#include "task_sample_hrs.h"
-//#include "task_sample_battery.h"
+#include "timer_sample_data.h"
 
 
 #define DEVICE_NAME                         "ECG_HRM"                            	/**< Name of device. Will be included in the advertising data. */
@@ -230,9 +229,7 @@ static void pm_evt_handler(pm_evt_t const * p_evt)
 static void battery_level_update(void)
 {
     ret_code_t err_code;
-    uint8_t  battery_level = 77;
-	
-	
+    const uint8_t  battery_level = g_vBatteryCapacity;
 
     err_code = ble_bas_battery_level_update(&m_bas, battery_level, BLE_CONN_HANDLE_ALL);
     if ((err_code != NRF_SUCCESS) &&
@@ -273,8 +270,7 @@ static void heart_rate_meas_timeout_handler(void * p_context)
 {
     UNUSED_PARAMETER(p_context);
 	
-    uint16_t        heart_rate = 99;	
-
+	const uint16_t heart_rate = g_vHeartRate;	
 
     ret_code_t err_code = ble_hrs_heart_rate_measurement_send(&m_hrs, heart_rate);
     if ((err_code != NRF_SUCCESS) &&
@@ -499,33 +495,6 @@ static void services_init(void)
     err_code = ble_dis_init(&dis_init);
     APP_ERROR_CHECK(err_code);
 }
-
-
-/**@brief Function for initializing the sensor simulators.
- */
-//static void sensor_simulator_init(void)
-//{
-//    m_battery_sim_cfg.min          = MIN_BATTERY_LEVEL;
-//    m_battery_sim_cfg.max          = MAX_BATTERY_LEVEL;
-//    m_battery_sim_cfg.incr         = BATTERY_LEVEL_INCREMENT;
-//    m_battery_sim_cfg.start_at_max = true;
-
-//    sensorsim_init(&m_battery_sim_state, &m_battery_sim_cfg);
-
-//    m_heart_rate_sim_cfg.min          = MIN_HEART_RATE;
-//    m_heart_rate_sim_cfg.max          = MAX_HEART_RATE;
-//    m_heart_rate_sim_cfg.incr         = HEART_RATE_INCREMENT;
-//    m_heart_rate_sim_cfg.start_at_max = false;
-
-//    sensorsim_init(&m_heart_rate_sim_state, &m_heart_rate_sim_cfg);
-
-//    m_rr_interval_sim_cfg.min          = MIN_RR_INTERVAL;
-//    m_rr_interval_sim_cfg.max          = MAX_RR_INTERVAL;
-//    m_rr_interval_sim_cfg.incr         = RR_INTERVAL_INCREMENT;
-//    m_rr_interval_sim_cfg.start_at_max = false;
-
-//    sensorsim_init(&m_rr_interval_sim_state, &m_rr_interval_sim_cfg);
-//}
 
 
 /**@brief Function for starting application timers.
@@ -887,107 +856,6 @@ static void buttons_leds_init(bool * p_erase_bonds)
 }
 
 
-
-#define RAW_ADC_BUFF_SIZE			5
-#define RAW_BATTERY_BUFF_SIZE			5
-static nrf_saadc_value_t m_buffer_pool[2][RAW_ADC_BUFF_SIZE];
-static uint32_t          m_transducer_evt_counter;
-static uint32_t          m_bat_evt_counter;
-
-
-static void saadc_transducer_callback(nrf_drv_saadc_evt_t const * p_event)
-{
-    uint8_t idx;
-
-    if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
-    {
-        APP_ERROR_CHECK(nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, RAW_ADC_BUFF_SIZE));
-      
-        NRF_LOG_INFO("ADC channel %d event number: %d",p_event->data.limit.channel, (int)m_transducer_evt_counter);
-
-        for (idx = 0; idx < RAW_ADC_BUFF_SIZE; idx++)
-        {
-            NRF_LOG_INFO("%d", p_event->data.done.p_buffer[idx]);
-        }
-        m_transducer_evt_counter++;
-    }
-}
-
-
-static void saadc_battery_callback(nrf_drv_saadc_evt_t const * p_event)
-{
-    uint8_t idx;
-
-    if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
-    {
-        APP_ERROR_CHECK(nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, RAW_BATTERY_BUFF_SIZE));
-
-        NRF_LOG_INFO("BATTERY event number: %d", (int)m_bat_evt_counter);
-
-        for (idx = 0; idx < RAW_BATTERY_BUFF_SIZE; idx++)
-        {
-            NRF_LOG_INFO("%d", p_event->data.done.p_buffer[idx]);
-        }
-        m_bat_evt_counter++;
-    }
-}
-
-static void saadc_init(void)
-{
-    nrf_saadc_channel_config_t adc_channel_config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1);
-    nrf_saadc_channel_config_t battery_channel_config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN2);
-
-    APP_ERROR_CHECK(nrf_drv_saadc_init(NULL, saadc_transducer_callback));
-    APP_ERROR_CHECK(nrf_drv_saadc_init(NULL, saadc_battery_callback));
-
-    APP_ERROR_CHECK(nrf_drv_saadc_channel_init(0, &adc_channel_config));
-    APP_ERROR_CHECK(nrf_drv_saadc_channel_init(1, &battery_channel_config));
-
-    APP_ERROR_CHECK(nrf_drv_saadc_buffer_convert(m_buffer_pool[0], RAW_ADC_BUFF_SIZE));
-    APP_ERROR_CHECK(nrf_drv_saadc_buffer_convert(m_buffer_pool[1], RAW_ADC_BUFF_SIZE));
-}
-
-const nrf_drv_timer_t TRANSDUCER_TIMER = NRF_DRV_TIMER_INSTANCE(1);
-const nrf_drv_timer_t BATTERY_TIMER = NRF_DRV_TIMER_INSTANCE(2);
-
-static nrf_ppi_channel_t TORQUE_SAADC_TIMER_PPI_CHANNEL;
-static nrf_ppi_channel_t BATTERY_SAADC_TIMER_PPI_CHANNEL;
-
-static void saadc_sampling_event_init(void)
-{
-    uint32_t transducer_timer_compare_event_addr, battery_timer_compare_event_addr;
-    uint32_t saadc_sample_task_addr;
-
-    APP_ERROR_CHECK(nrf_drv_ppi_init());
-
-    nrf_drv_timer_enable(&TRANSDUCER_TIMER);
-    nrf_drv_timer_enable(&BATTERY_TIMER);
-
-    transducer_timer_compare_event_addr = nrf_drv_timer_compare_event_address_get(&TRANSDUCER_TIMER, NRF_TIMER_CC_CHANNEL0);
-    battery_timer_compare_event_addr = nrf_drv_timer_compare_event_address_get(&BATTERY_TIMER, NRF_TIMER_CC_CHANNEL0);
-    
-    saadc_sample_task_addr = nrf_drv_saadc_sample_task_get();
-    /* Setup ppi channel so that timer compare event is triggering sample tasks in SAADC */
-    APP_ERROR_CHECK(nrf_drv_ppi_channel_alloc(&TORQUE_SAADC_TIMER_PPI_CHANNEL));
-    APP_ERROR_CHECK(nrf_drv_ppi_channel_alloc(&BATTERY_SAADC_TIMER_PPI_CHANNEL));
-
-    APP_ERROR_CHECK(nrf_drv_ppi_channel_assign(TORQUE_SAADC_TIMER_PPI_CHANNEL, transducer_timer_compare_event_addr, saadc_sample_task_addr));
-    APP_ERROR_CHECK(nrf_drv_ppi_channel_assign(BATTERY_SAADC_TIMER_PPI_CHANNEL, battery_timer_compare_event_addr, saadc_sample_task_addr));
-}
-
-
-static void saadc_sampling_event_enable(void)
-{
-    APP_ERROR_CHECK(nrf_drv_ppi_channel_enable(TORQUE_SAADC_TIMER_PPI_CHANNEL));
-
-    APP_ERROR_CHECK(nrf_drv_ppi_channel_enable(BATTERY_SAADC_TIMER_PPI_CHANNEL));
-}
-
-
-
-
-
-
 /**@brief Function for initializing the nrf log module.
  */
 static void log_init(void)
@@ -1064,9 +932,7 @@ int main(void)
     application_timers_start();
     advertising_start(erase_bonds);
 	
-	saadc_init();
-    saadc_sampling_event_init();
-    saadc_sampling_event_enable();
+	task_sample_enable();
 
     // Enter main loop.
     for (;;)

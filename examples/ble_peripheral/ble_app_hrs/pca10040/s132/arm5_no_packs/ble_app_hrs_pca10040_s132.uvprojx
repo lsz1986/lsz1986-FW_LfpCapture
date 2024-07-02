@@ -393,6 +393,11 @@
               <FileType>5</FileType>
               <FilePath>..\config\sdk_config.h</FilePath>
             </File>
+            <File>
+              <FileName>timer_sample_data.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\timer_sample_data.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -6761,6 +6766,11 @@
               <FileName>sdk_config.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\config\sdk_config.h</FilePath>
+            </File>
+            <File>
+              <FileName>timer_sample_data.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\timer_sample_data.c</FilePath>
             </File>
           </Files>
         </Group>

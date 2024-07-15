@@ -14,14 +14,7 @@
 
 	
 	
-#define RAW_ADC_BUFF_SIZE				6
 
-typedef enum{
-	SAMPLE_CHANNEL_HEART_RATE,
-	SAMPLE_CHANNEL_BATTERY_CAPACITY,
-	SAMPLE_CHANNEL_SIZE
-}SAMPLE_CHANNEL_IDX;
-#define SAMPLE_SUM_PER_FRAME (RAW_ADC_BUFF_SIZE/SAMPLE_CHANNEL_SIZE)
 
 
 static nrf_saadc_value_t m_buffer_pool[2][RAW_ADC_BUFF_SIZE];
@@ -37,7 +30,8 @@ static nrf_ppi_channel_t BATTERY_SAADC_TIMER_PPI_CHANNEL;
 static uint32_t heart_rate_timer_compare_event_addr, battery_timer_compare_event_addr;
 
 
-uint16_t g_vBatteryCapacity = 0, g_vHeartRate = 0;
+volatile uint16_t g_vBatteryCapacity[SAMPLE_SUM_PER_FRAME] = {0};
+volatile uint16_t g_vHeartRate[SAMPLE_SUM_PER_FRAME] = {0};
 
 
 static void saadc_init(void);
@@ -63,24 +57,20 @@ static void saadc_transducer_callback(nrf_drv_saadc_evt_t const * p_event)
 //        NRF_LOG_INFO("[%d %d] channel %d  event: %d", battery_timer_compare_event_addr, heart_rate_timer_compare_event_addr,
 //		p_event->data.limit.channel, (int)m_transducer_evt_counter);
 	
-	uint16_t vHeartRate = 0, vBatteryCapacity = 0;
-	uint8_t idx = 0;
+	uint8_t idx = 0, i = 0, j = 0;
 	for (idx = 0; idx < RAW_ADC_BUFF_SIZE; idx++)
 	{
 		switch(idx%SAMPLE_CHANNEL_SIZE){
 		case SAMPLE_CHANNEL_HEART_RATE:
-			vHeartRate += p_event->data.done.p_buffer[idx];
+			g_vHeartRate[++i] = p_event->data.done.p_buffer[idx];
 			break;
 		case SAMPLE_CHANNEL_BATTERY_CAPACITY:
-			vBatteryCapacity += p_event->data.done.p_buffer[idx];
+			g_vBatteryCapacity[++j] = p_event->data.done.p_buffer[idx];
 			break;
 		}
 	}
 	
-	g_vHeartRate = vHeartRate / (double)SAMPLE_SUM_PER_FRAME;
-	g_vBatteryCapacity = vBatteryCapacity/(double)SAMPLE_SUM_PER_FRAME;
-	
-	NRF_LOG_INFO("Heart Rate[%d] Battery Capacity[%d]", g_vHeartRate, g_vBatteryCapacity);
+	//NRF_LOG_INFO("Heart Rate[%d] Battery Capacity[%d]", g_vHeartRate, g_vBatteryCapacity);
 }
 
 static  void saadc_init(void)

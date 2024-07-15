@@ -229,9 +229,14 @@ static void pm_evt_handler(pm_evt_t const * p_evt)
 static void battery_level_update(void)
 {
     ret_code_t err_code;
-    const uint8_t  battery_level = g_vBatteryCapacity;
+	uint16_t battery_level = g_vBatteryCapacity[0];
+	for(uint16_t i = 0; i < SAMPLE_SUM_PER_FRAME; ++i)
+	{
+		battery_level += g_vBatteryCapacity[i];
+	}
+    battery_level /= SAMPLE_SUM_PER_FRAME;
 
-    err_code = ble_bas_battery_level_update(&m_bas, battery_level, BLE_CONN_HANDLE_ALL);
+    err_code = ble_bas_battery_level_update(&m_bas, (uint8_t)battery_level, BLE_CONN_HANDLE_ALL);
     if ((err_code != NRF_SUCCESS) &&
         (err_code != NRF_ERROR_INVALID_STATE) &&
         (err_code != NRF_ERROR_RESOURCES) &&
@@ -270,18 +275,20 @@ static void heart_rate_meas_timeout_handler(void * p_context)
 {
     UNUSED_PARAMETER(p_context);
 	
-	const uint16_t heart_rate = g_vHeartRate;	
-
-    ret_code_t err_code = ble_hrs_heart_rate_measurement_send(&m_hrs, heart_rate);
-    if ((err_code != NRF_SUCCESS) &&
-        (err_code != NRF_ERROR_INVALID_STATE) &&
-        (err_code != NRF_ERROR_RESOURCES) &&
-        (err_code != NRF_ERROR_BUSY) &&
-        (err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
-       )
-    {
-        APP_ERROR_HANDLER(err_code);
-    }
+	for(uint16_t i = 0; i < SAMPLE_SUM_PER_FRAME; ++i)
+	{
+		const uint16_t heart_rate = g_vHeartRate[i];
+		ret_code_t err_code = ble_hrs_heart_rate_measurement_send(&m_hrs, heart_rate);
+		if ((err_code != NRF_SUCCESS) &&
+			(err_code != NRF_ERROR_INVALID_STATE) &&
+			(err_code != NRF_ERROR_RESOURCES) &&
+			(err_code != NRF_ERROR_BUSY) &&
+			(err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+		   )
+		{
+			APP_ERROR_HANDLER(err_code);
+		}
+	}
 
     // Disable RR Interval recording every third heart rate measurement.
     // NOTE: An application will normally not do this. It is done here just for testing generation
